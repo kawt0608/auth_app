@@ -13,7 +13,7 @@ export function LoginForm() {
     <form action={formAction} className="form">
       {state.error ? <div className="error-box">{state.error}</div> : null}
       <div className="field">
-        <label htmlFor="email">メールアドレス</label>
+        <label htmlFor="email">Email address</label>
         <input
           autoComplete="email"
           id="email"
@@ -25,15 +25,15 @@ export function LoginForm() {
       <PasswordField
         autoComplete="current-password"
         id="password"
-        label="パスワード"
+        label="Password"
         name="password"
       />
       <label className="checkbox">
         <input name="rememberMe" type="checkbox" />
-        ログイン状態を保持する
+        Keep me signed in
       </label>
       <button className="primary-button" disabled={pending} type="submit">
-        {pending ? "ログイン中..." : "ログイン"}
+        {pending ? "Signing in..." : "Sign in"}
       </button>
     </form>
   );

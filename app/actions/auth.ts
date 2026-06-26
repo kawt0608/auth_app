@@ -1,9 +1,6 @@
 "use server";
 
-import {
-  Prisma,
-  UserStatus as PrismaUserStatus
-} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
@@ -28,26 +25,44 @@ import {
 } from "@/lib/login-security";
 import { isAcceptablePassword } from "@/lib/password-strength";
 import { prisma } from "@/lib/prisma";
+import { assertSameOriginRequest } from "@/lib/security";
 
 export type ActionState = {
   error?: string;
+  success?: string;
 };
 
 const loginSchema = z.object({
-  email: z.string().email("メールアドレスの形式が正しくありません").max(254),
-  password: z.string().min(1, "パスワードを入力してください").max(128)
+  email: z.string().email("Enter a valid email address.").max(254),
+  password: z.string().min(1, "Enter your password.").max(128)
 });
 
 const signupSchema = z.object({
-  name: z.string().trim().min(1, "名前を入力してください").max(80),
-  email: z.string().email("メールアドレスの形式が正しくありません").max(254),
-  password: z.string().min(1, "パスワードを入力してください").max(128)
+  name: z.string().trim().min(1, "Enter your name.").max(80),
+  email: z.string().email("Enter a valid email address.").max(254),
+  password: z.string().min(1, "Enter a password.").max(128),
+  confirmPassword: z.string().min(1, "Confirm your password.").max(128)
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Enter your current password.").max(128),
+  newPassword: z.string().min(1, "Enter a new password.").max(128),
+  confirmPassword: z.string().min(1, "Confirm your new password.").max(128)
 });
 
 function validationError(error: z.ZodError) {
   return {
-    error: error.issues[0]?.message ?? "入力内容を確認してください"
+    error: error.issues[0]?.message ?? "Check the form values."
   };
+}
+
+async function sameOriginOrError() {
+  try {
+    await assertSameOriginRequest();
+    return null;
+  } catch {
+    return { error: "Request origin could not be verified." };
+  }
 }
 
 async function recordFailedLogin(
@@ -98,10 +113,22 @@ async function recordFailedLogin(
 async function clearUserLoginFailures(
   tx: Prisma.TransactionClient,
   email: string,
-  userId: string
+  userId: string,
+  ipAddress?: string,
+  clearActiveIpLocks = false
 ) {
+  const keys = [`email:${normalizeEmail(email)}`];
+  if (ipAddress) {
+    keys.push(`ip:${ipAddress}`);
+  }
+
   await tx.loginAttempt.deleteMany({
-    where: { key: `email:${normalizeEmail(email)}` }
+    where: {
+      OR: [
+        { key: { in: keys } },
+        ...(clearActiveIpLocks ? [{ key: { startsWith: "ip:" } }] : [])
+      ]
+    }
   });
   await tx.user.update({
     where: { id: userId },
@@ -116,6 +143,11 @@ export async function loginAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const originError = await sameOriginOrError();
+  if (originError) {
+    return originError;
+  }
+
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password")
@@ -144,25 +176,30 @@ export async function loginAction(
     where: { email }
   });
 
-  if (
-    user?.lockedUntil &&
-    user.lockedUntil.getTime() > now.getTime()
-  ) {
+  if (user?.lockedUntil && user.lockedUntil.getTime() > now.getTime()) {
     return { error: getLockMessage(user.lockedUntil) };
   }
 
   if (!user) {
-    await prisma.$transaction((tx) =>
-      recordFailedLogin(tx, attemptKeys, undefined, now)
-    );
+    await prisma.$transaction(async (tx) => {
+      await recordFailedLogin(tx, attemptKeys, undefined, now);
+      await tx.securityEvent.create({
+        data: {
+          type: "login_failure",
+          summary: `Failed login for unknown email ${email}.`,
+          ipAddress,
+          userAgent
+        }
+      });
+    });
     return {
-      error: "メールアドレスまたはパスワードが正しくありません。"
+      error: "Email or password is incorrect."
     };
   }
 
-  if (user.status !== PrismaUserStatus.ACTIVE) {
+  if (user.status !== "ACTIVE") {
     return {
-      error: "このアカウントは停止されています。管理者に連絡してください。"
+      error: "This account is suspended. Contact an administrator."
     };
   }
 
@@ -172,11 +209,20 @@ export async function loginAction(
   );
 
   if (!passwordMatches) {
-    await prisma.$transaction((tx) =>
-      recordFailedLogin(tx, attemptKeys, user.id, now)
-    );
+    await prisma.$transaction(async (tx) => {
+      await recordFailedLogin(tx, attemptKeys, user.id, now);
+      await tx.securityEvent.create({
+        data: {
+          type: "login_failure",
+          summary: "Failed login with an incorrect password.",
+          userId: user.id,
+          ipAddress,
+          userAgent
+        }
+      });
+    });
     return {
-      error: "メールアドレスまたはパスワードが正しくありません。"
+      error: "Email or password is incorrect."
     };
   }
 
@@ -184,7 +230,7 @@ export async function loginAction(
   const expiresAt = new Date(now.getTime() + getSessionDuration(rememberMe));
 
   await prisma.$transaction(async (tx) => {
-    await clearUserLoginFailures(tx, email, user.id);
+    await clearUserLoginFailures(tx, email, user.id, ipAddress);
     await tx.session.create({
       data: buildSessionRecord({
         userId: user.id,
@@ -194,6 +240,17 @@ export async function loginAction(
         userAgent,
         now
       })
+    });
+    await tx.securityEvent.create({
+      data: {
+        type: "login_success",
+        summary: rememberMe
+          ? "Signed in with Remember me enabled."
+          : "Signed in with a regular session.",
+        userId: user.id,
+        ipAddress,
+        userAgent
+      }
     });
   });
 
@@ -206,20 +263,30 @@ export async function signupAction(
   _prevState: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const originError = await sameOriginOrError();
+  if (originError) {
+    return originError;
+  }
+
   const parsed = signupSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
-    password: formData.get("password")
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword")
   });
 
   if (!parsed.success) {
     return validationError(parsed.error);
   }
 
+  if (parsed.data.password !== parsed.data.confirmPassword) {
+    return { error: "Passwords do not match." };
+  }
+
   if (!isAcceptablePassword(parsed.data.password)) {
     return {
       error:
-        "パスワードは10文字以上で、大文字・小文字・数字・記号のうち4項目以上を満たしてください。"
+        "Use a stronger password with length, mixed case, number, and symbol coverage."
     };
   }
 
@@ -250,6 +317,15 @@ export async function signupAction(
           now
         })
       });
+      await tx.securityEvent.create({
+        data: {
+          type: "signup",
+          summary: "Account created and signed in.",
+          userId: user.id,
+          ipAddress,
+          userAgent
+        }
+      });
     });
   } catch (error) {
     if (
@@ -257,12 +333,12 @@ export async function signupAction(
       error.code === "P2002"
     ) {
       return {
-        error: "このメールアドレスはすでに登録されています。"
+        error: "This email address is already registered."
       };
     }
 
     return {
-      error: "アカウントを作成できませんでした。時間をおいて再試行してください。"
+      error: "Could not create the account. Try again later."
     };
   }
 
@@ -272,16 +348,29 @@ export async function signupAction(
 }
 
 export async function logoutAction() {
+  await assertSameOriginRequest();
   const cookieStore = await cookies();
   const current = await getCurrentSession();
+  const { ipAddress, userAgent } = await getRequestMetadata();
 
   if (current) {
-    await prisma.session.updateMany({
-      where: {
-        id: current.session.id,
-        revokedAt: null
-      },
-      data: { revokedAt: new Date() }
+    await prisma.$transaction(async (tx) => {
+      await tx.session.updateMany({
+        where: {
+          id: current.session.id,
+          revokedAt: null
+        },
+        data: { revokedAt: new Date() }
+      });
+      await tx.securityEvent.create({
+        data: {
+          type: "logout",
+          summary: "Signed out of the current session.",
+          userId: current.user.id,
+          ipAddress,
+          userAgent
+        }
+      });
     });
   }
 
@@ -290,6 +379,7 @@ export async function logoutAction() {
 }
 
 export async function revokeSessionAction(formData: FormData) {
+  await assertSameOriginRequest();
   const sessionId = String(formData.get("sessionId") ?? "");
   const current = await getCurrentSession();
 
@@ -308,12 +398,28 @@ export async function revokeSessionAction(formData: FormData) {
     redirect("/sessions");
   }
 
-  await prisma.session.update({
-    where: { id: session.id },
-    data: { revokedAt: new Date() }
+  await prisma.$transaction(async (tx) => {
+    await tx.session.update({
+      where: { id: session.id },
+      data: { revokedAt: new Date() }
+    });
+    await tx.securityEvent.create({
+      data: {
+        type: "session_revoked",
+        summary:
+          session.id === current.session.id
+            ? "Revoked the current session."
+            : "Revoked another active session.",
+        userId: current.user.id,
+        actorUserId: current.user.id,
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent
+      }
+    });
   });
 
   revalidatePath("/sessions");
+  revalidatePath("/security");
 
   if (session.id === current.session.id) {
     const cookieStore = await cookies();
@@ -324,7 +430,144 @@ export async function revokeSessionAction(formData: FormData) {
   redirect("/sessions");
 }
 
+export async function changePasswordAction(
+  _prevState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const originError = await sameOriginOrError();
+  if (originError) {
+    return originError;
+  }
+
+  const current = await getCurrentSession();
+  if (!current) {
+    redirect("/login");
+  }
+
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword")
+  });
+
+  if (!parsed.success) {
+    return validationError(parsed.error);
+  }
+
+  if (parsed.data.newPassword !== parsed.data.confirmPassword) {
+    return { error: "New passwords do not match." };
+  }
+
+  if (!isAcceptablePassword(parsed.data.newPassword)) {
+    return { error: "Choose a stronger new password." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: current.user.id }
+  });
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  const currentPasswordMatches = await bcrypt.compare(
+    parsed.data.currentPassword,
+    user.passwordHash
+  );
+
+  if (!currentPasswordMatches) {
+    return { error: "Current password is incorrect." };
+  }
+
+  const reusesCurrentPassword = await bcrypt.compare(
+    parsed.data.newPassword,
+    user.passwordHash
+  );
+
+  if (reusesCurrentPassword) {
+    return { error: "Use a new password that is different from the current one." };
+  }
+
+  const { ipAddress, userAgent } = await getRequestMetadata();
+  const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        loginFailures: 0,
+        lockedUntil: null
+      }
+    });
+    await tx.loginAttempt.deleteMany({
+      where: { key: `email:${user.email}` }
+    });
+    await tx.session.updateMany({
+      where: {
+        userId: user.id,
+        id: { not: current.session.id },
+        revokedAt: null
+      },
+      data: { revokedAt: now }
+    });
+    await tx.securityEvent.create({
+      data: {
+        type: "password_changed",
+        summary: "Password changed and other sessions were revoked.",
+        userId: user.id,
+        actorUserId: user.id,
+        ipAddress,
+        userAgent
+      }
+    });
+  });
+
+  revalidatePath("/security");
+  revalidatePath("/sessions");
+  return { success: "Password changed. Other sessions were signed out." };
+}
+
+export async function logoutOtherSessionsAction() {
+  await assertSameOriginRequest();
+  const current = await getCurrentSession();
+
+  if (!current) {
+    redirect("/login");
+  }
+
+  const { ipAddress, userAgent } = await getRequestMetadata();
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.session.updateMany({
+      where: {
+        userId: current.user.id,
+        id: { not: current.session.id },
+        revokedAt: null
+      },
+      data: { revokedAt: now }
+    });
+    await tx.securityEvent.create({
+      data: {
+        type: "other_sessions_revoked",
+        summary: "Signed out all other active sessions.",
+        userId: current.user.id,
+        actorUserId: current.user.id,
+        ipAddress,
+        userAgent
+      }
+    });
+  });
+
+  revalidatePath("/security");
+  revalidatePath("/sessions");
+  redirect("/security");
+}
+
 export async function suspendUserAction(formData: FormData) {
+  await assertSameOriginRequest();
   const { current, userId } = await getUsersAndTarget(formData);
   const now = new Date();
 
@@ -335,7 +578,7 @@ export async function suspendUserAction(formData: FormData) {
         NOT: { id: current.user.id }
       },
       data: {
-        status: PrismaUserStatus.SUSPENDED
+        status: "SUSPENDED"
       }
     });
 
@@ -347,29 +590,54 @@ export async function suspendUserAction(formData: FormData) {
         },
         data: { revokedAt: now }
       });
+      await tx.securityEvent.create({
+        data: {
+          type: "admin_user_suspended",
+          summary: `Admin suspended user ${userId}.`,
+          userId,
+          actorUserId: current.user.id
+        }
+      });
     }
   });
 
   revalidatePath("/admin/users");
+  revalidatePath("/admin/audit");
   redirect("/admin/users");
 }
 
 export async function activateUserAction(formData: FormData) {
-  const { userId } = await getUsersAndTarget(formData);
+  await assertSameOriginRequest();
+  const { current, userId } = await getUsersAndTarget(formData);
 
-  await prisma.user.updateMany({
-    where: { id: userId },
-    data: {
-      status: PrismaUserStatus.ACTIVE
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.updateMany({
+      where: { id: userId },
+      data: {
+        status: "ACTIVE"
+      }
+    });
+
+    if (updated.count > 0) {
+      await tx.securityEvent.create({
+        data: {
+          type: "admin_user_activated",
+          summary: `Admin activated user ${userId}.`,
+          userId,
+          actorUserId: current.user.id
+        }
+      });
     }
   });
 
   revalidatePath("/admin/users");
+  revalidatePath("/admin/audit");
   redirect("/admin/users");
 }
 
 export async function unlockUserAction(formData: FormData) {
-  const { userId } = await getUsersAndTarget(formData);
+  await assertSameOriginRequest();
+  const { current, userId } = await getUsersAndTarget(formData);
 
   await prisma.$transaction(async (tx) => {
     const target = await tx.user.findUnique({
@@ -381,10 +649,19 @@ export async function unlockUserAction(formData: FormData) {
       return;
     }
 
-    await clearUserLoginFailures(tx, target.email, target.id);
+    await clearUserLoginFailures(tx, target.email, target.id, undefined, true);
+    await tx.securityEvent.create({
+      data: {
+        type: "admin_user_unlocked",
+        summary: `Admin cleared login lock for ${target.email}.`,
+        userId: target.id,
+        actorUserId: current.user.id
+      }
+    });
   });
 
   revalidatePath("/admin/users");
+  revalidatePath("/admin/audit");
   redirect("/admin/users");
 }
 

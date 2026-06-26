@@ -14,14 +14,13 @@ export default async function SignupPage() {
     <main className="narrow-page">
       <section className="panel auth-panel">
         <p className="eyebrow">Sign up</p>
-        <h1>サインアップ</h1>
+        <h1>Create account</h1>
         <p className="lead">
-          パスワードはサーバー側でも検証し、bcryptでハッシュ化して保存します。
+          Passwords are validated on the server and stored as bcrypt hashes.
         </p>
         <SignupForm />
         <p className="form-footer">
-          すでに登録済みの場合は <Link href="/login">ログイン</Link>
-          してください。
+          Already registered? <Link href="/login">Sign in</Link>.
         </p>
       </section>
     </main>

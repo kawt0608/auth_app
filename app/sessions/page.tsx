@@ -9,16 +9,17 @@ export default async function SessionsPage() {
     <main className="page section-stack">
       <section>
         <p className="eyebrow">Sessions</p>
-        <h1>アクティブセッション</h1>
+        <h1>Active sessions</h1>
         <p className="lead">
-          現在ログインしているユーザーの有効なセッションを一覧表示し、不要なセッションを個別に無効化できます。
+          Review every active session for your account and revoke any session
+          you no longer trust.
         </p>
       </section>
 
       {sessions.length === 0 ? (
-        <div className="empty">有効なセッションはありません。</div>
+        <div className="empty">No active sessions were found.</div>
       ) : (
-        <section className="session-list" aria-label="セッション一覧">
+        <section className="session-list" aria-label="Session list">
           {sessions.map((session) => (
             <article className="session-row" key={session.id}>
               <div>
@@ -26,25 +27,24 @@ export default async function SessionsPage() {
                   {session.userAgent}
                   {session.isCurrent ? (
                     <span className="badge" data-tone="success">
-                      現在のセッション
+                      Current session
                     </span>
                   ) : null}
                 </h2>
                 <div className="meta-grid">
-                  <span>作成日時: {formatDateTime(session.createdAt)}</span>
-                  <span>最終利用: {formatDateTime(session.lastUsedAt)}</span>
-                  <span>期限: {formatDateTime(session.expiresAt)}</span>
+                  <span>Created: {formatDateTime(session.createdAt)}</span>
+                  <span>Last used: {formatDateTime(session.lastUsedAt)}</span>
+                  <span>Expires: {formatDateTime(session.expiresAt)}</span>
                   <span>IP: {session.ipAddress}</span>
                   <span>
-                    種別:{" "}
-                    {session.rememberMe ? "Remember me" : "通常セッション"}
+                    Type: {session.rememberMe ? "Remember me" : "Regular"}
                   </span>
                 </div>
               </div>
               <form action={revokeSessionAction}>
                 <input name="sessionId" type="hidden" value={session.id} />
                 <button className="danger-button" type="submit">
-                  ログアウト
+                  Revoke
                 </button>
               </form>
             </article>

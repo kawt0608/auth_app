@@ -15,6 +15,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:push": "prisma db push",
+    "local:setup": "prisma generate --schema prisma/schema.local.prisma && tsx scripts/setup-local-db.ts && tsx scripts/seed.ts --reset",
     "seed": "tsx scripts/seed.ts",
     "vercel-build": "prisma generate && prisma migrate deploy && next build"
   },

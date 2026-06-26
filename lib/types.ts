@@ -39,3 +39,14 @@ export type PublicUser = Omit<UserRecord, "passwordHash">;
 export type PublicSession = Omit<SessionRecord, "tokenHash"> & {
   isCurrent: boolean;
 };
+
+export type SecurityEventRecord = {
+  id: string;
+  userId: string | null;
+  actorUserId: string | null;
+  type: string;
+  summary: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: Date;
+};

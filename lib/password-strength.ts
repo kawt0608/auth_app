@@ -15,7 +15,7 @@ export type PasswordCheck = {
 export type PasswordStrength = {
   score: number;
   maxScore: number;
-  label: "弱い" | "普通" | "強い";
+  label: "Weak" | "Medium" | "Strong";
   percent: number;
   checks: PasswordCheck[];
   improvements: string[];
@@ -25,38 +25,38 @@ export function evaluatePasswordStrength(password: string): PasswordStrength {
   const checks: PasswordCheck[] = [
     {
       key: "length",
-      label: "10文字以上",
+      label: "At least 10 characters",
       passed: password.length >= 10,
-      improvement: "10文字以上にしてください"
+      improvement: "Use at least 10 characters."
     },
     {
       key: "uppercase",
-      label: "大文字",
+      label: "Uppercase letter",
       passed: /[A-Z]/.test(password),
-      improvement: "英大文字を1文字以上追加してください"
+      improvement: "Add at least one uppercase letter."
     },
     {
       key: "lowercase",
-      label: "小文字",
+      label: "Lowercase letter",
       passed: /[a-z]/.test(password),
-      improvement: "英小文字を1文字以上追加してください"
+      improvement: "Add at least one lowercase letter."
     },
     {
       key: "number",
-      label: "数字",
+      label: "Number",
       passed: /\d/.test(password),
-      improvement: "数字を1文字以上追加してください"
+      improvement: "Add at least one number."
     },
     {
       key: "symbol",
-      label: "記号",
+      label: "Symbol",
       passed: /[^A-Za-z0-9]/.test(password),
-      improvement: "記号を1文字以上追加してください"
+      improvement: "Add at least one symbol."
     }
   ];
 
   const score = checks.filter((check) => check.passed).length;
-  const label = score <= 2 ? "弱い" : score <= 4 ? "普通" : "強い";
+  const label = score <= 2 ? "Weak" : score <= 4 ? "Medium" : "Strong";
 
   return {
     score,

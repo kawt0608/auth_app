@@ -25,7 +25,7 @@ export function getLockMessage(lockedUntil: Date | string) {
   );
   const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
 
-  return `ログイン試行回数が上限に達しました。約${remainingMinutes}分後に再試行してください。`;
+  return `Too many failed sign-in attempts. Try again in about ${remainingMinutes} minute(s).`;
 }
 
 export function findActiveLock(

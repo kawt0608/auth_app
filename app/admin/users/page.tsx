@@ -13,23 +13,24 @@ export default async function AdminUsersPage() {
     <main className="page section-stack">
       <section>
         <p className="eyebrow">Admin</p>
-        <h1>ユーザー管理</h1>
+        <h1>User management</h1>
         <p className="lead">
-          管理者だけがアクセスできます。停止、停止解除、ログインロック解除はすべてサーバー側でロール確認します。
+          Admin-only actions are checked on the server and recorded in the
+          security audit log.
         </p>
       </section>
 
-      <section className="table-wrap" aria-label="ユーザー一覧">
+      <section className="table-wrap" aria-label="User list">
         <table>
           <thead>
             <tr>
-              <th>ユーザー</th>
-              <th>ロール</th>
-              <th>状態</th>
-              <th>失敗回数</th>
-              <th>ロック期限</th>
-              <th>作成日時</th>
-              <th>操作</th>
+              <th>User</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Failures</th>
+              <th>Locked until</th>
+              <th>Created</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -37,11 +38,11 @@ export default async function AdminUsersPage() {
               const isSelf = user.id === current.user.id;
               const locked =
                 user.lockedUntil &&
-                new Date(user.lockedUntil).getTime() > Date.now();
+                user.lockedUntil.getTime() > Date.now();
 
               return (
                 <tr key={user.id}>
-                  <td>
+                  <td data-label="User">
                     <strong>{user.name}</strong>
                     <br />
                     <span>{user.email}</span>
@@ -49,32 +50,34 @@ export default async function AdminUsersPage() {
                       <>
                         <br />
                         <span className="badge" data-tone="success">
-                          自分
+                          You
                         </span>
                       </>
                     ) : null}
                   </td>
-                  <td>{user.role === "admin" ? "管理者" : "一般"}</td>
-                  <td>
+                  <td data-label="Role">
+                    {user.role === "admin" ? "Admin" : "User"}
+                  </td>
+                  <td data-label="Status">
                     <span
                       className="badge"
                       data-tone={user.status === "active" ? "success" : "danger"}
                     >
-                      {user.status === "active" ? "有効" : "停止中"}
+                      {user.status === "active" ? "Active" : "Suspended"}
                     </span>
                   </td>
-                  <td>{user.loginFailures}</td>
-                  <td>
+                  <td data-label="Failures">{user.loginFailures}</td>
+                  <td data-label="Locked until">
                     {locked ? (
                       <span className="badge" data-tone="warning">
                         {formatOptionalDateTime(user.lockedUntil)}
                       </span>
                     ) : (
-                      "なし"
+                      "None"
                     )}
                   </td>
-                  <td>{formatDateTime(user.createdAt)}</td>
-                  <td>
+                  <td data-label="Created">{formatDateTime(user.createdAt)}</td>
+                  <td data-label="Actions">
                     <div className="action-row">
                       {user.status === "active" ? (
                         <form action={suspendUserAction}>
@@ -84,21 +87,21 @@ export default async function AdminUsersPage() {
                             disabled={isSelf}
                             type="submit"
                           >
-                            停止
+                            Suspend
                           </button>
                         </form>
                       ) : (
                         <form action={activateUserAction}>
                           <input name="userId" type="hidden" value={user.id} />
                           <button className="small-button" type="submit">
-                            停止解除
+                            Activate
                           </button>
                         </form>
                       )}
                       <form action={unlockUserAction}>
                         <input name="userId" type="hidden" value={user.id} />
                         <button className="small-button" type="submit">
-                          ロック解除
+                          Clear lock
                         </button>
                       </form>
                     </div>

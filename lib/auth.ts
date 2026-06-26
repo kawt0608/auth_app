@@ -1,14 +1,14 @@
-import {
-  UserRole as PrismaUserRole,
-  UserStatus as PrismaUserStatus,
-  type Session,
-  type User
-} from "@prisma/client";
+import { type Session, type User } from "@prisma/client";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
 import { prisma } from "./prisma";
-import type { PublicSession, PublicUser, SessionRecord } from "./types";
+import type {
+  PublicSession,
+  PublicUser,
+  SecurityEventRecord,
+  SessionRecord
+} from "./types";
 
 export const AUTH_COOKIE_NAME = "auth_app_session";
 export const REGULAR_SESSION_MS = 2 * 60 * 60 * 1000;
@@ -32,8 +32,8 @@ export function toPublicUser(user: User): PublicUser {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: user.role === PrismaUserRole.ADMIN ? "admin" : "user",
-    status: user.status === PrismaUserStatus.SUSPENDED ? "suspended" : "active",
+    role: user.role === "ADMIN" ? "admin" : "user",
+    status: user.status === "SUSPENDED" ? "suspended" : "active",
     loginFailures: user.loginFailures,
     lockedUntil: user.lockedUntil,
     createdAt: user.createdAt,
@@ -150,7 +150,7 @@ export async function getCurrentSession(): Promise<CurrentSession | null> {
     return null;
   }
 
-  if (session.user.status !== PrismaUserStatus.ACTIVE) {
+  if (session.user.status !== "ACTIVE") {
     await prisma.session.update({
       where: { id: session.id },
       data: { revokedAt: now }
@@ -222,4 +222,27 @@ export async function getUsersForAdmin() {
   ).map(toPublicUser);
 
   return { current, users };
+}
+
+export async function getSecurityEventsForCurrentUser() {
+  const current = await requireUser();
+  const events: SecurityEventRecord[] = await prisma.securityEvent.findMany({
+    where: {
+      OR: [{ userId: current.user.id }, { actorUserId: current.user.id }]
+    },
+    orderBy: { createdAt: "desc" },
+    take: 40
+  });
+
+  return { current, events };
+}
+
+export async function getSecurityEventsForAdmin() {
+  const current = await requireAdmin();
+  const events: SecurityEventRecord[] = await prisma.securityEvent.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 100
+  });
+
+  return { current, events };
 }

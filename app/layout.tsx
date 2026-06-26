@@ -17,7 +17,7 @@ export default async function RootLayout({
   const current = await getCurrentSession();
 
   return (
-    <html lang="ja">
+    <html lang="en">
       <body>
         <div className="app-shell">
           <header className="site-header">
@@ -26,24 +26,28 @@ export default async function RootLayout({
                 <span className="brand__mark">A</span>
                 <span>Auth Assignment</span>
               </Link>
-              <nav className="nav" aria-label="メインナビゲーション">
+              <nav className="nav" aria-label="Main navigation">
                 {current ? (
                   <>
-                    <Link href="/dashboard">ダッシュボード</Link>
-                    <Link href="/sessions">セッション</Link>
+                    <Link href="/dashboard">Dashboard</Link>
+                    <Link href="/security">Security</Link>
+                    <Link href="/sessions">Sessions</Link>
                     {current.user.role === "admin" ? (
-                      <Link href="/admin/users">ユーザー管理</Link>
+                      <>
+                        <Link href="/admin/users">Users</Link>
+                        <Link href="/admin/audit">Audit</Link>
+                      </>
                     ) : null}
                     <form action={logoutAction}>
                       <button className="ghost-button" type="submit">
-                        ログアウト
+                        Sign out
                       </button>
                     </form>
                   </>
                 ) : (
                   <>
-                    <Link href="/login">ログイン</Link>
-                    <Link href="/signup">サインアップ</Link>
+                    <Link href="/login">Sign in</Link>
+                    <Link href="/signup">Sign up</Link>
                   </>
                 )}
               </nav>

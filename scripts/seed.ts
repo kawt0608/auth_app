@@ -1,6 +1,8 @@
-import { UserRole, UserStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+
+const demoUserIds = ["user_demo", "admin_demo"];
+const resetDatabase = process.argv.includes("--reset");
 
 async function main() {
   const [userPasswordHash, adminPasswordHash] = await Promise.all([
@@ -9,16 +11,31 @@ async function main() {
   ]);
 
   await prisma.$transaction(async (tx) => {
-    await tx.session.deleteMany({
-      where: { userId: { in: ["user_demo", "admin_demo"] } }
-    });
-    await tx.loginAttempt.deleteMany({
-      where: {
-        key: {
-          in: ["email:user@example.com", "email:admin@example.com"]
+    if (resetDatabase) {
+      await tx.securityEvent.deleteMany();
+      await tx.session.deleteMany();
+      await tx.loginAttempt.deleteMany();
+      await tx.user.deleteMany();
+    } else {
+      await tx.session.deleteMany({
+        where: { userId: { in: demoUserIds } }
+      });
+      await tx.loginAttempt.deleteMany({
+        where: {
+          key: {
+            in: ["email:user@example.com", "email:admin@example.com"]
+          }
         }
-      }
-    });
+      });
+      await tx.securityEvent.deleteMany({
+        where: {
+          OR: [
+            { userId: { in: demoUserIds } },
+            { actorUserId: { in: demoUserIds } }
+          ]
+        }
+      });
+    }
 
     await tx.user.upsert({
       where: { email: "user@example.com" },
@@ -27,14 +44,14 @@ async function main() {
         name: "Demo User",
         email: "user@example.com",
         passwordHash: userPasswordHash,
-        role: UserRole.USER,
-        status: UserStatus.ACTIVE
+        role: "USER",
+        status: "ACTIVE"
       },
       update: {
         name: "Demo User",
         passwordHash: userPasswordHash,
-        role: UserRole.USER,
-        status: UserStatus.ACTIVE,
+        role: "USER",
+        status: "ACTIVE",
         loginFailures: 0,
         lockedUntil: null
       }
@@ -47,21 +64,36 @@ async function main() {
         name: "Admin User",
         email: "admin@example.com",
         passwordHash: adminPasswordHash,
-        role: UserRole.ADMIN,
-        status: UserStatus.ACTIVE
+        role: "ADMIN",
+        status: "ACTIVE"
       },
       update: {
         name: "Admin User",
         passwordHash: adminPasswordHash,
-        role: UserRole.ADMIN,
-        status: UserStatus.ACTIVE,
+        role: "ADMIN",
+        status: "ACTIVE",
         loginFailures: 0,
         lockedUntil: null
       }
     });
+
+    await tx.securityEvent.createMany({
+      data: [
+        {
+          userId: "user_demo",
+          type: "seed",
+          summary: "Demo user account was seeded."
+        },
+        {
+          userId: "admin_demo",
+          type: "seed",
+          summary: "Demo admin account was seeded."
+        }
+      ]
+    });
   });
 
-  console.log("Seeded demo users in PostgreSQL.");
+  console.log("Seeded demo users.");
   console.log("user@example.com / Password123!");
   console.log("admin@example.com / AdminPassword123!");
 }

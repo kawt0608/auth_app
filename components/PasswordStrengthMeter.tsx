@@ -14,7 +14,7 @@ export function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) 
   return (
     <div className="strength" aria-live="polite">
       <div className="strength__top">
-        <span>強度: {password ? strength.label : "未入力"}</span>
+        <span>Strength: {password ? strength.label : "Not entered"}</span>
         <span>
           {strength.score}/{strength.maxScore}
         </span>
@@ -26,14 +26,14 @@ export function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) 
           style={{ width: `${strength.percent}%` }}
         />
       </div>
-      <ul className="check-grid" aria-label="パスワード要件">
+      <ul className="check-grid" aria-label="Password requirements">
         {strength.checks.map((check) => (
           <li
             className="check-pill"
             data-passed={check.passed}
             key={check.key}
           >
-            {check.passed ? "OK " : "未達 "}
+            {check.passed ? "OK " : "Missing "}
             {check.label}
           </li>
         ))}

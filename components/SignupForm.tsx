@@ -15,7 +15,7 @@ export function SignupForm() {
     <form action={formAction} className="form">
       {state.error ? <div className="error-box">{state.error}</div> : null}
       <div className="field">
-        <label htmlFor="name">名前</label>
+        <label htmlFor="name">Name</label>
         <input
           autoComplete="name"
           id="name"
@@ -25,7 +25,7 @@ export function SignupForm() {
         />
       </div>
       <div className="field">
-        <label htmlFor="email">メールアドレス</label>
+        <label htmlFor="email">Email address</label>
         <input
           autoComplete="email"
           id="email"
@@ -37,14 +37,20 @@ export function SignupForm() {
       <PasswordField
         autoComplete="new-password"
         id="password"
-        label="パスワード"
+        label="Password"
         name="password"
         onChange={setPassword}
         value={password}
       />
+      <PasswordField
+        autoComplete="new-password"
+        id="confirmPassword"
+        label="Confirm password"
+        name="confirmPassword"
+      />
       <PasswordStrengthMeter password={password} />
       <button className="primary-button" disabled={pending} type="submit">
-        {pending ? "作成中..." : "アカウント作成"}
+        {pending ? "Creating account..." : "Create account"}
       </button>
     </form>
   );

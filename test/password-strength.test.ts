@@ -8,12 +8,12 @@ import {
 test("password strength evaluates all required character classes", () => {
   const weak = evaluatePasswordStrength("abc");
   assert.equal(weak.score, 1);
-  assert.equal(weak.label, "弱い");
-  assert.ok(weak.improvements.includes("10文字以上にしてください"));
+  assert.equal(weak.label, "Weak");
+  assert.ok(weak.improvements.includes("Use at least 10 characters."));
 
   const strong = evaluatePasswordStrength("Password123!");
   assert.equal(strong.score, 5);
-  assert.equal(strong.label, "強い");
+  assert.equal(strong.label, "Strong");
   assert.deepEqual(strong.improvements, []);
 });
 

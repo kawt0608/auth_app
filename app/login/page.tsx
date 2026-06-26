@@ -14,14 +14,14 @@ export default async function LoginPage() {
     <main className="narrow-page">
       <section className="panel auth-panel">
         <p className="eyebrow">Login</p>
-        <h1>ログイン</h1>
+        <h1>Sign in</h1>
         <p className="lead">
-          Remember me を選ぶと、通常より長いセッション期限でログインします。
+          Use a regular two-hour session, or enable Remember me for a longer
+          session lifetime.
         </p>
         <LoginForm />
         <p className="form-footer">
-          アカウントがない場合は <Link href="/signup">サインアップ</Link>
-          してください。
+          No account yet? <Link href="/signup">Create one</Link>.
         </p>
       </section>
     </main>

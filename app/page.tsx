@@ -13,18 +13,19 @@ export default async function HomePage() {
     <main className="page">
       <section className="hero">
         <div className="hero__body">
-          <p className="eyebrow">Next.js / TypeScript 認証課題</p>
-          <h1>セッションベース認証を安全に確認できるWebアプリ</h1>
+          <p className="eyebrow">Next.js / TypeScript security assignment</p>
+          <h1>Secure session-based authentication with Prisma</h1>
           <p className="lead">
-            パスワード強度表示、表示切り替え、ログイン試行制限、
-            Remember me、アクティブセッション管理、管理者向けユーザー管理を実装しています。
+            This app demonstrates password strength checks, account lockout,
+            Remember me sessions, session revocation, password change,
+            audit logs, admin authorization, CSRF checks, and security headers.
           </p>
           <div className="toolbar">
             <Link className="primary-button" href="/signup">
-              サインアップ
+              Create account
             </Link>
             <Link className="button-link" href="/login">
-              ログイン
+              Sign in
             </Link>
           </div>
         </div>

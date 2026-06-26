@@ -9,37 +9,40 @@ export default async function DashboardPage() {
     <main className="page section-stack">
       <section>
         <p className="eyebrow">Dashboard</p>
-        <h1>{user.name} さんのダッシュボード</h1>
+        <h1>{user.name} dashboard</h1>
         <p className="lead">
-          認証済みユーザーだけが見られるページです。セッション状態とロールを確認できます。
+          This page is protected by server-side session validation.
         </p>
       </section>
 
-      <section className="summary-grid" aria-label="ログイン状態">
+      <section className="summary-grid" aria-label="Login state">
         <article className="summary-card">
-          <h2>ロール</h2>
-          <strong>{user.role === "admin" ? "管理者" : "一般ユーザー"}</strong>
-          <p>管理者機能はサーバー側でもロール確認します。</p>
+          <h2>Role</h2>
+          <strong>{user.role === "admin" ? "Admin" : "User"}</strong>
+          <p>Admin screens also verify the role on the server.</p>
         </article>
         <article className="summary-card">
-          <h2>セッション期限</h2>
+          <h2>Session expires</h2>
           <strong>{formatDateTime(session.expiresAt)}</strong>
-          <p>{session.rememberMe ? "Remember me 有効" : "通常セッション"}</p>
+          <p>{session.rememberMe ? "Remember me enabled" : "Regular session"}</p>
         </article>
         <article className="summary-card">
-          <h2>最終利用</h2>
+          <h2>Last used</h2>
           <strong>{formatDateTime(session.lastUsedAt)}</strong>
-          <p>ページ表示時にサーバー側で更新されます。</p>
+          <p>The timestamp is updated during server-side session checks.</p>
         </article>
       </section>
 
       <section className="toolbar">
-        <Link className="primary-button" href="/sessions">
-          セッション一覧を開く
+        <Link className="primary-button" href="/security">
+          Open security settings
+        </Link>
+        <Link className="button-link" href="/sessions">
+          Manage sessions
         </Link>
         {user.role === "admin" ? (
           <Link className="button-link" href="/admin/users">
-            ユーザー管理を開く
+            Manage users
           </Link>
         ) : null}
       </section>

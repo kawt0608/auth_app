@@ -41,7 +41,7 @@ export function PasswordField({
           onClick={() => setVisible((current) => !current)}
           type="button"
         >
-          {visible ? "非表示" : "表示"}
+          {visible ? "Hide" : "Show"}
         </button>
       </div>
     </div>
