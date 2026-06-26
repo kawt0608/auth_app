@@ -2,7 +2,7 @@
 
 Next.js / TypeScript で実装した、認証・認可機能付きの Web セキュリティアプリです。
 
-セッションベース認証を採用し、Prisma ORM でユーザー、セッション、ログイン試行、監査イベントを管理します。デプロイ環境では PostgreSQL を想定し、ローカル確認では Docker や PostgreSQL なしでも動かせるよう SQLite 用の `prisma/schema.local.prisma` も用意しています。
+セッションベース認証を採用し、Prisma ORM とローカル SQLite でユーザー、セッション、ログイン試行、監査イベントを管理します。このリポジトリはローカル評価で動作確認できることを前提にしています。
 
 ## アプリ概要
 
@@ -16,8 +16,7 @@ Next.js / TypeScript で実装した、認証・認可機能付きの Web セキ
 - TypeScript
 - React 19
 - Prisma ORM
-- PostgreSQL: Vercel などの本番デプロイ用
-- SQLite: ローカル評価用
+- SQLite
 - bcryptjs
 - zod
 - ESLint
@@ -68,7 +67,6 @@ password: AdminPassword123!
 - DB にはセッショントークンの SHA-256 ハッシュのみ保存します。
 - パスワードは bcrypt でハッシュ化して保存します。
 - Cookie は `HttpOnly`、`SameSite=Lax`、`path=/`、明示的な有効期限を設定します。
-- 本番環境では Cookie に `Secure` を付与します。
 - 通常セッションの有効期限は 2 時間です。
 - Remember me 有効時のセッション有効期限は 30 日です。
 
