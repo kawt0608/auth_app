@@ -10,15 +10,21 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx \"test/**/*.test.ts\"",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "local:setup": "prisma generate && tsx scripts/setup-local-db.ts && tsx scripts/seed.ts --reset",
-    "seed": "tsx scripts/seed.ts"
+    "db:push": "prisma db push",
+    "local:setup": "prisma generate --schema prisma/schema.local.prisma && tsx scripts/setup-local-db.ts && tsx scripts/seed.ts --reset",
+    "seed": "tsx scripts/seed.ts",
+    "vercel-build": "prisma generate && prisma migrate deploy && next build"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^2.4.3",
     "next": "^15.3.4",
     "postcss": "^8.5.10",
+    "prisma": "^6.19.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^3.25.67"
@@ -31,7 +37,6 @@
     "@types/react-dom": "^19.0.4",
     "eslint": "^9.29.0",
     "eslint-config-next": "^15.3.4",
-    "prisma": "^6.19.3",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3"
   },

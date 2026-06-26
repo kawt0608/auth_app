@@ -2,7 +2,7 @@
 
 Next.js / TypeScript で実装した、認証・認可機能付きの Web セキュリティアプリです。
 
-セッションベース認証を採用し、Prisma ORM とローカル SQLite でユーザー、セッション、ログイン試行、監査イベントを管理します。このリポジトリはローカル評価で動作確認できることを前提にしています。
+セッションベース認証を採用し、Prisma ORM でユーザー、セッション、ログイン試行、監査イベントを管理します。ローカルでは SQLite、Vercel では PostgreSQL を使って動作する構成です。
 
 ## アプリ概要
 
@@ -16,7 +16,8 @@ Next.js / TypeScript で実装した、認証・認可機能付きの Web セキ
 - TypeScript
 - React 19
 - Prisma ORM
-- SQLite
+- SQLite: ローカル確認用
+- PostgreSQL: Vercel デプロイ用
 - bcryptjs
 - zod
 - ESLint
@@ -43,6 +44,36 @@ http://localhost:3000
 
 `npm run local:setup` はローカル SQLite DB を初期化し、確認用アカウントを作り直します。
 
+## Vercel デプロイ方法
+
+Vercel では SQLite ファイルを永続化できないため、PostgreSQL を使用します。Vercel Marketplace の Prisma Postgres、Neon、Supabase などで PostgreSQL を作成し、Vercel の Environment Variables に次を設定してください。
+
+```text
+DATABASE_URL=postgresql://...
+```
+
+このリポジトリには `vercel.json` を追加しており、Vercel の Build Command は自動的に次になります。
+
+```bash
+npm run vercel-build
+```
+
+`npm run vercel-build` は以下を実行します。
+
+```bash
+prisma generate && prisma migrate deploy && next build
+```
+
+そのため、Vercel デプロイ時に Prisma Client 生成、DB migration 適用、Next.js build まで実行されます。
+
+デプロイ後に確認用アカウントを作りたい場合は、Vercel の本番 `DATABASE_URL` を設定した信頼できる端末で次を一度だけ実行してください。
+
+```bash
+npm run seed
+```
+
+`npm run seed` はデモアカウントを upsert します。ローカル用の `npm run local:setup` と違い、DB 全体をリセットしません。
+
 ## テスト用アカウント
 
 `npm run local:setup` 実行後、以下のアカウントでログインできます。
@@ -67,6 +98,7 @@ password: AdminPassword123!
 - DB にはセッショントークンの SHA-256 ハッシュのみ保存します。
 - パスワードは bcrypt でハッシュ化して保存します。
 - Cookie は `HttpOnly`、`SameSite=Lax`、`path=/`、明示的な有効期限を設定します。
+- Vercel 上では Cookie に `Secure` が付きます。
 - 通常セッションの有効期限は 2 時間です。
 - Remember me 有効時のセッション有効期限は 30 日です。
 
