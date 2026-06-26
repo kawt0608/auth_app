@@ -1,24 +1,32 @@
 # Auth Assignment App
 
-This is a Next.js / TypeScript authentication and authorization assignment app.
+Next.js / TypeScript で実装した、認証・認可機能付きの Web セキュリティ課題アプリです。
 
-The app uses session-based authentication with Prisma ORM. Production is designed for PostgreSQL. Local-only development can use SQLite through `prisma/schema.local.prisma` so the app can run without Docker or a local PostgreSQL server.
+セッションベース認証を採用し、Prisma ORM でユーザー、セッション、ログイン試行、監査イベントを管理します。デプロイ環境では PostgreSQL を想定し、ローカル確認では Docker や PostgreSQL なしでも動かせるよう SQLite 用の `prisma/schema.local.prisma` も用意しています。
 
-## Tech Stack
+## アプリ概要
+
+このアプリでは、ユーザーがサインアップ、ログイン、ログアウトを行えます。ログイン後はダッシュボード、セキュリティ設定、アクティブセッション一覧を確認できます。
+
+管理者ユーザーは、一般ユーザーには表示されないユーザー管理画面と監査ログ画面にアクセスできます。管理者機能は画面表示だけでなく、サーバー側の処理でも必ずロール確認を行います。
+
+## 使用技術
 
 - Next.js 15 App Router
 - TypeScript
 - React 19
 - Prisma ORM
-- PostgreSQL for deployment
-- SQLite for local-only evaluation
+- PostgreSQL: Vercel などの本番デプロイ用
+- SQLite: ローカル評価用
 - bcryptjs
 - zod
-- ESLint / TypeScript / Node test
+- ESLint
+- TypeScript typecheck
+- Node.js test runner
 
-## Local Run
+## ローカル起動方法
 
-Use this path when you only want to run the app locally.
+ローカルだけで確認する場合は、次の手順で起動できます。
 
 ```bash
 npm install
@@ -28,280 +36,285 @@ npm run build
 npm run start
 ```
 
-Open:
+起動後、ブラウザで次を開きます。
 
 ```text
 http://localhost:3000
 ```
 
-Demo accounts after `npm run local:setup`:
+`npm run local:setup` はローカル SQLite DB を初期化し、確認用アカウントを作り直します。
+
+## テスト用アカウント
+
+`npm run local:setup` 実行後、以下のアカウントでログインできます。
 
 ```text
-User:
+一般ユーザー:
 email: user@example.com
 password: Password123!
 
-Admin:
+管理者:
 email: admin@example.com
 password: AdminPassword123!
 ```
 
-`npm run local:setup` resets the local SQLite database and recreates these demo accounts.
+## Vercel デプロイ方法
 
-## PostgreSQL / Vercel Deployment
+Vercel では PostgreSQL を使用してください。Prisma Postgres、Neon、Supabase などが利用できます。
 
-For Vercel, set `DATABASE_URL` to a PostgreSQL database such as Prisma Postgres, Neon, or Supabase.
-
-Recommended Vercel Build Command:
-
-```bash
-npm run vercel-build
-```
-
-That runs:
-
-```bash
-prisma generate && prisma migrate deploy && next build
-```
-
-Required environment variable:
+Vercel の Environment Variables に次を設定します。
 
 ```text
 DATABASE_URL=postgresql://...
 ```
 
-If demo accounts are needed in production, run this once from a trusted terminal with the production `DATABASE_URL`. This command upserts the demo accounts and does not reset the database:
+Vercel の Build Command は次を指定します。
+
+```bash
+npm run vercel-build
+```
+
+このコマンドでは以下を実行します。
+
+```bash
+prisma generate && prisma migrate deploy && next build
+```
+
+本番環境にもデモアカウントが必要な場合は、本番用 `DATABASE_URL` を設定した信頼できる端末から一度だけ実行してください。
 
 ```bash
 npm run seed
 ```
 
-## Authentication Method
+`npm run seed` はデモアカウントを upsert します。ローカル用の `npm run local:setup` と違い、本番 DB 全体をリセットしません。
 
-The app uses server-side session authentication.
+## 認証方式
 
-- Login creates a random session token.
-- The cookie stores the raw session token.
-- The database stores only the SHA-256 hash of the token.
-- Passwords are stored with bcrypt hashes.
-- Cookies use `HttpOnly`, `SameSite=Lax`, `path=/`, and explicit expiration.
-- Cookies use `Secure` in production.
-- Regular sessions last 2 hours.
-- Remember me sessions last 30 days.
+セッションベース認証を採用しています。
 
-## Implemented Security Features
+- ログイン成功時にランダムなセッショントークンを生成します。
+- Cookie には生のセッショントークンを保存します。
+- DB にはセッショントークンの SHA-256 ハッシュのみ保存します。
+- パスワードは bcrypt でハッシュ化して保存します。
+- Cookie は `HttpOnly`、`SameSite=Lax`、`path=/`、明示的な有効期限を設定します。
+- 本番環境では Cookie に `Secure` を付与します。
+- 通常セッションの有効期限は 2 時間です。
+- Remember me 有効時のセッション有効期限は 30 日です。
 
-### 1. Password Strength Meter
+## 実装した認証・認可機能
 
-The sign-up form evaluates the password in real time.
+### 1. パスワード強度表示
 
-Checks:
+サインアップ画面で、入力中のパスワード強度をリアルタイムに表示します。
 
-- At least 10 characters
-- Uppercase letter
-- Lowercase letter
-- Number
-- Symbol
+評価項目:
 
-The same rule is enforced on the server before account creation.
+- 10文字以上
+- 大文字
+- 小文字
+- 数字
+- 記号
 
-Confirmation steps:
+同じルールをサーバー側でも検証し、弱いパスワードではアカウントを作成できません。
 
-1. Open `/signup`.
-2. Type `abc`.
-3. Confirm that missing requirements are shown.
-4. Type `Password123!`.
-5. Confirm that all requirements pass.
+確認方法:
 
-![Password strength and confirmation](./public/screenshots/signup-security.png)
+1. `/signup` を開きます。
+2. `abc` など弱いパスワードを入力します。
+3. 不足している条件が表示されることを確認します。
+4. `Password123!` を入力します。
+5. すべての条件が OK になり、強度が `Strong` になることを確認します。
 
-### 2. Password Show / Hide Toggle
+![パスワード強度表示](./public/screenshots/signup-security.png)
 
-Login, sign-up, and password-change forms include a show/hide toggle for password inputs.
+### 2. パスワード表示・非表示切り替え
 
-Confirmation steps:
+ログイン、サインアップ、パスワード変更フォームに `Show` / `Hide` ボタンを追加しています。
 
-1. Open `/login`, `/signup`, or `/security`.
-2. Enter a password.
-3. Click `Show`.
-4. Confirm that the password input changes from hidden to visible.
-5. Click `Hide` to hide it again.
+確認方法:
 
-### 3. Password Confirmation on Sign Up
+1. `/login`、`/signup`、または `/security` を開きます。
+2. パスワードを入力します。
+3. `Show` をクリックします。
+4. 入力欄の `type` が `password` から `text` に切り替わり、値が表示されることを確認します。
+5. `Hide` をクリックし、再び非表示になることを確認します。
 
-The sign-up form requires a confirmation password. The server rejects mismatched passwords.
+### 3. サインアップ時のパスワード確認
 
-Confirmation steps:
+サインアップ時に確認用パスワードを入力させ、サーバー側で一致確認を行います。
 
-1. Open `/signup`.
-2. Enter different values in `Password` and `Confirm password`.
-3. Submit the form.
-4. Confirm that the server returns `Passwords do not match.`
+確認方法:
 
-### 4. Login Rate Limiting and Lockout
+1. `/signup` を開きます。
+2. `Password` と `Confirm password` に異なる値を入力します。
+3. 送信します。
+4. `Passwords do not match.` が表示され、アカウントが作成されないことを確認します。
 
-Failed login attempts are recorded by email address and IP address.
+### 4. ログイン試行回数制限・ロックアウト
 
-Rules:
+短時間にログイン失敗が続いた場合、一定時間ログインを制限します。
 
-- 5 failures within 10 minutes causes a lockout.
-- Lockout lasts 5 minutes.
-- The error message shows how long the user should wait.
-- Admins can clear a user's lock.
+ルール:
 
-Confirmation steps:
+- メールアドレス単位と IP アドレス単位で失敗回数を記録します。
+- 10分以内に 5 回失敗するとロックします。
+- ロック時間は 5 分です。
+- ロック中は残り時間の目安を含むエラーメッセージを表示します。
+- 管理者はユーザー管理画面からロック解除できます。
 
-1. Open `/login`.
-2. Use `user@example.com` with the wrong password several times.
-3. Confirm that the lockout message appears.
-4. Sign in as admin and clear the lock from `/admin/users`.
+確認方法:
 
-![Login lockout](./public/screenshots/login-lockout.png)
+1. `/login` を開きます。
+2. `user@example.com` に対して間違ったパスワードを複数回入力します。
+3. ロックアウトメッセージが表示されることを確認します。
+4. 管理者でログインし、`/admin/users` から `Clear lock` を実行できることを確認します。
 
-### 5. Remember Me Session Lifetime
+![ログインロックアウト](./public/screenshots/login-lockout.png)
 
-The login form includes `Keep me signed in`.
+### 5. Remember me
 
-- Disabled: 2-hour session
-- Enabled: 30-day session
+ログイン画面に `Keep me signed in` チェックボックスを追加しています。
 
-Confirmation steps:
+- チェックなし: 2時間セッション
+- チェックあり: 30日セッション
 
-1. Open `/login`.
-2. Check `Keep me signed in`.
-3. Sign in.
-4. Open `/dashboard`.
-5. Confirm that the session is marked as Remember me and expires later.
+確認方法:
 
-![Remember me dashboard](./public/screenshots/dashboard-remember-me.png)
+1. `/login` を開きます。
+2. `Keep me signed in` にチェックを入れます。
+3. ログインします。
+4. `/dashboard` を開きます。
+5. セッション種別が Remember me になり、有効期限が通常より長いことを確認します。
 
-### 6. Active Session List and Per-Session Revoke
+![Remember me](./public/screenshots/dashboard-remember-me.png)
 
-The `/sessions` page lists active sessions for the current user only.
+### 6. アクティブセッション一覧・個別ログアウト
 
-Displayed fields:
+`/sessions` で、ログイン中ユーザー自身のアクティブセッションだけを一覧表示します。
+
+表示項目:
 
 - User-Agent
-- IP address
-- Created time
-- Last used time
-- Expiration time
-- Remember me status
-- Current session marker
+- IP アドレス
+- 作成日時
+- 最終利用日時
+- 有効期限
+- Remember me 状態
+- 現在のセッションかどうか
 
-Each session can be revoked. Revoking the current session signs the browser out.
+各セッションは個別に無効化できます。現在のセッションを無効化した場合は、そのブラウザもログアウトされます。
 
-Confirmation steps:
+確認方法:
 
-1. Sign in.
-2. Open `/sessions`.
-3. Confirm the current session is listed.
-4. Click `Revoke`.
-5. Confirm that the session is invalidated.
+1. ログインします。
+2. `/sessions` を開きます。
+3. 現在のセッションが表示されることを確認します。
+4. `Revoke` をクリックします。
+5. セッションが無効化されることを確認します。
 
-![Active sessions](./public/screenshots/sessions.png)
+![アクティブセッション](./public/screenshots/sessions.png)
 
-### 7. Password Change With Current Password
+### 7. 現在のパスワード確認付きパスワード変更
 
-The `/security` page lets a signed-in user change their password.
+`/security` でログイン中ユーザーがパスワードを変更できます。
 
-Rules:
+ルール:
 
-- Current password is required.
-- New password must pass the strength policy.
-- New password must be different from the current password.
-- Other active sessions are revoked after a successful password change.
-- A security event is recorded.
+- 現在のパスワード入力が必須です。
+- 新しいパスワードは強度ルールを満たす必要があります。
+- 現在のパスワードと同じ値は拒否します。
+- 変更成功後、現在のセッション以外を無効化します。
+- 監査イベントを記録します。
 
-Confirmation steps:
+確認方法:
 
-1. Sign in.
-2. Open `/security`.
-3. Try an incorrect current password and confirm rejection.
-4. Enter the correct current password and a strong new password.
-5. Confirm the success message and event log entry.
+1. ログインします。
+2. `/security` を開きます。
+3. 間違った現在のパスワードを入力し、拒否されることを確認します。
+4. 正しい現在のパスワードと強い新パスワードを入力します。
+5. 成功メッセージと監査イベントが表示されることを確認します。
 
-![Security settings](./public/screenshots/security-settings.png)
+![セキュリティ設定](./public/screenshots/security-settings.png)
 
-### 8. Sign Out Other Sessions
+### 8. 他セッション一括ログアウト
 
-The `/security` page includes a button to revoke all other active sessions while keeping the current browser signed in.
+`/security` に、現在のブラウザ以外のセッションを一括で無効化するボタンを実装しています。
 
-Confirmation steps:
+確認方法:
 
-1. Sign in from more than one browser or session.
-2. Open `/security`.
-3. Click `Sign out other sessions`.
-4. Confirm that only the current session remains on `/sessions`.
+1. 複数ブラウザまたは複数セッションでログインします。
+2. `/security` を開きます。
+3. `Sign out other sessions` をクリックします。
+4. `/sessions` で現在のセッションだけが残っていることを確認します。
 
-### 9. Security Event History
+### 9. セキュリティイベント履歴
 
-Security events are recorded in the database.
+認証・認可に関するイベントを DB に記録します。
 
-Examples:
+記録する主なイベント:
 
-- Sign-up
-- Successful login
-- Failed login
-- Logout
-- Session revocation
-- Password change
-- Admin account actions
-- Blocked cross-origin form submissions
+- サインアップ
+- ログイン成功
+- ログイン失敗
+- ログアウト
+- セッション無効化
+- パスワード変更
+- 管理者によるアカウント操作
+- Origin 不一致によるブロック
 
-Users can view their own recent events on `/security`.
+一般ユーザーは `/security` で自分に関係するイベントだけを確認できます。
 
-![Security event history](./public/screenshots/security-settings.png)
+![セキュリティイベント履歴](./public/screenshots/security-settings.png)
 
-### 10. Admin-Only User Management
+### 10. 管理者限定ユーザー管理
 
-Admins can access `/admin/users`.
+管理者のみ `/admin/users` にアクセスできます。
 
-Admin actions:
+管理者ができること:
 
-- View users
-- Suspend accounts
-- Activate accounts
-- Clear login locks
-- Revoke suspended users' active sessions
+- ユーザー一覧表示
+- アカウント停止
+- アカウント有効化
+- ログインロック解除
+- 停止ユーザーのアクティブセッション無効化
 
-Authorization is enforced on the server. Normal users are redirected away from admin pages and cannot run admin server actions.
+一般ユーザーは画面にも API にもアクセスできないよう、サーバー側で `role` を確認しています。
 
-![Admin users](./public/screenshots/admin-users.png)
+![管理者ユーザー管理](./public/screenshots/admin-users.png)
 
-### 11. Admin Audit Log
+### 11. 管理者限定監査ログ
 
-Admins can access `/admin/audit` to review recent security events for all users.
+管理者のみ `/admin/audit` で全ユーザーのセキュリティイベントを確認できます。
 
-Confirmation steps:
+確認方法:
 
-1. Sign in as `admin@example.com`.
-2. Open `/admin/audit`.
-3. Confirm that login, password, session, and admin events are listed.
+1. `admin@example.com` でログインします。
+2. `/admin/audit` を開きます。
+3. ログイン、パスワード変更、セッション操作、管理者操作のイベントが表示されることを確認します。
 
-![Admin audit log](./public/screenshots/admin-audit.png)
+![管理者監査ログ](./public/screenshots/admin-audit.png)
 
-### 12. CSRF / Origin Check for Mutating Actions
+### 12. CSRF 対策としての Origin チェック
 
-Every mutating server action verifies that the request `Origin` matches the current host.
+状態を変更する Server Action では、リクエストの `Origin` と現在の `Host` が一致するか確認します。
 
-Protected actions include:
+対象操作:
 
-- Login
-- Sign-up
-- Logout
-- Session revoke
-- Password change
-- Sign out other sessions
-- Admin suspend / activate / unlock
+- ログイン
+- サインアップ
+- ログアウト
+- セッション無効化
+- パスワード変更
+- 他セッション一括ログアウト
+- 管理者による停止、有効化、ロック解除
 
-Blocked cross-origin form submissions are recorded as security events.
+Origin が一致しないリクエストは拒否し、監査イベントとして記録します。
 
-### 13. Security Headers
+### 13. セキュリティヘッダー
 
-The app sets security headers from `next.config.ts`.
+`next.config.ts` でセキュリティ関連ヘッダーを設定しています。
 
-Headers include:
+設定している主なヘッダー:
 
 - `Content-Security-Policy`
 - `Referrer-Policy`
@@ -310,24 +323,38 @@ Headers include:
 - `Permissions-Policy`
 - `Strict-Transport-Security`
 
-Confirmation command:
+確認コマンド:
 
 ```bash
 Invoke-WebRequest -Uri http://localhost:3000/login -UseBasicParsing | Select-Object -ExpandProperty Headers
 ```
 
-## Main Routes
+## セキュリティ上の工夫
 
-- `/` Home
-- `/signup` Sign up
-- `/login` Sign in
-- `/dashboard` Protected dashboard
-- `/security` Account security and event history
-- `/sessions` Active session management
-- `/admin/users` Admin user management
-- `/admin/audit` Admin audit log
+- パスワードは平文保存せず、bcrypt でハッシュ化しています。
+- セッショントークンは DB に平文保存せず、SHA-256 ハッシュのみ保存しています。
+- 認証・認可は Server Component / Server Action 側で検証しています。
+- 管理者機能はサーバー側で `role` を確認しています。
+- 入力値は zod でサーバー側検証しています。
+- Cookie は `HttpOnly`、`SameSite=Lax`、`Secure`、有効期限を設定しています。
+- ログイン失敗回数をメールアドレスと IP アドレスの両方で記録しています。
+- アカウント停止時は対象ユーザーのアクティブセッションを無効化します。
+- パスワード変更時は他セッションを無効化します。
+- 内部エラーや秘密情報を画面に表示しないようにしています。
+- 不要な教材由来の別認証方式やショップ、ニュース系サンプルコードは含めていません。
 
-## Checks
+## 主なルート
+
+- `/` ホーム
+- `/signup` サインアップ
+- `/login` ログイン
+- `/dashboard` ログイン後ダッシュボード
+- `/security` セキュリティ設定、イベント履歴
+- `/sessions` アクティブセッション管理
+- `/admin/users` 管理者ユーザー管理
+- `/admin/audit` 管理者監査ログ
+
+## 確認コマンド
 
 ```bash
 npm run lint
@@ -337,10 +364,19 @@ npm run build
 npm audit --omit=dev
 ```
 
-## Known Limitations
+実施済み確認:
 
-- Email verification is not implemented.
-- Password reset email flow is not implemented.
-- Multi-factor authentication is not implemented.
-- Local SQLite setup is for local evaluation only. Vercel deployment should use PostgreSQL.
-- CSP allows inline scripts/styles because Next.js needs them in this configuration. A nonce-based CSP would be stronger for production.
+- `npm run local:setup`
+- `npm run lint`
+- `npm run typecheck`
+- `npm test`
+- `npm run build`
+- `npm audit --omit=dev`
+
+## 注意点・未実装事項
+
+- メールアドレス確認機能は未実装です。
+- パスワードリセットメール送信機能は未実装です。
+- 多要素認証は未実装です。
+- ローカル SQLite は評価・動作確認用です。Vercel では PostgreSQL を使用してください。
+- 現在の CSP は Next.js の動作に必要なため `unsafe-inline` / `unsafe-eval` を許可しています。本番運用でさらに強化する場合は nonce ベースの CSP が望ましいです。
