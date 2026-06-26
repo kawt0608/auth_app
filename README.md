@@ -1,6 +1,6 @@
 # Auth Assignment App
 
-Next.js / TypeScript で実装した、認証・認可機能付きの Web セキュリティ課題アプリです。
+Next.js / TypeScript で実装した、認証・認可機能付きの Web セキュリティアプリです。
 
 セッションベース認証を採用し、Prisma ORM でユーザー、セッション、ログイン試行、監査イベントを管理します。デプロイ環境では PostgreSQL を想定し、ローカル確認では Docker や PostgreSQL なしでも動かせるよう SQLite 用の `prisma/schema.local.prisma` も用意しています。
 
@@ -58,35 +58,6 @@ email: admin@example.com
 password: AdminPassword123!
 ```
 
-## Vercel デプロイ方法
-
-Vercel では PostgreSQL を使用してください。Prisma Postgres、Neon、Supabase などが利用できます。
-
-Vercel の Environment Variables に次を設定します。
-
-```text
-DATABASE_URL=postgresql://...
-```
-
-Vercel の Build Command は次を指定します。
-
-```bash
-npm run vercel-build
-```
-
-このコマンドでは以下を実行します。
-
-```bash
-prisma generate && prisma migrate deploy && next build
-```
-
-本番環境にもデモアカウントが必要な場合は、本番用 `DATABASE_URL` を設定した信頼できる端末から一度だけ実行してください。
-
-```bash
-npm run seed
-```
-
-`npm run seed` はデモアカウントを upsert します。ローカル用の `npm run local:setup` と違い、本番 DB 全体をリセットしません。
 
 ## 認証方式
 
@@ -372,11 +343,3 @@ npm audit --omit=dev
 - `npm test`
 - `npm run build`
 - `npm audit --omit=dev`
-
-## 注意点・未実装事項
-
-- メールアドレス確認機能は未実装です。
-- パスワードリセットメール送信機能は未実装です。
-- 多要素認証は未実装です。
-- ローカル SQLite は評価・動作確認用です。Vercel では PostgreSQL を使用してください。
-- 現在の CSP は Next.js の動作に必要なため `unsafe-inline` / `unsafe-eval` を許可しています。本番運用でさらに強化する場合は nonce ベースの CSP が望ましいです。
